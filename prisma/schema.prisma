@@ -11,6 +11,7 @@ datasource db {
 
 model Location {
   id        String   @id @default(cuid())
+  hotelId   String   @default("tokyo")
   floor     String
   roomName  String
   photoUrl  String?
@@ -22,11 +23,12 @@ model Location {
   snapshots InventorySnapshot[]
   stockLogs StockLog[]
 
-  @@index([floor])
+  @@index([hotelId, floor])
 }
 
 model Item {
   id             String   @id @default(cuid())
+  hotelId        String   @default("tokyo")
   name           String
   category       String?
   photoUrl       String?
@@ -41,7 +43,7 @@ model Item {
   snapshots InventorySnapshot[]
   stockLogs StockLog[]
 
-  @@index([category])
+  @@index([hotelId, category])
 }
 
 enum StockLogType {
@@ -51,6 +53,7 @@ enum StockLogType {
 
 model StockLog {
   id           String       @id @default(cuid())
+  hotelId      String       @default("tokyo")
   occurredAt   DateTime     @default(now())
   type         StockLogType
   itemId       String
@@ -63,13 +66,14 @@ model StockLog {
   item     Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
   location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
-  @@index([itemId, occurredAt])
-  @@index([locationId, occurredAt])
-  @@index([type, occurredAt])
+  @@index([hotelId, itemId, occurredAt])
+  @@index([hotelId, locationId, occurredAt])
+  @@index([hotelId, type, occurredAt])
 }
 
 model InventorySnapshot {
   id           String   @id @default(cuid())
+  hotelId      String   @default("tokyo")
   yearMonth    String
   itemId       String
   locationId   String
@@ -81,14 +85,17 @@ model InventorySnapshot {
   item     Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
   location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
-  @@unique([yearMonth, itemId, locationId])
-  @@index([yearMonth])
+  @@unique([hotelId, yearMonth, itemId, locationId])
+  @@index([hotelId, yearMonth])
 }
 
 model MonthlyCloseStatus {
-  yearMonth String    @id
+  hotelId   String
+  yearMonth String
   closedAt  DateTime?
   closedBy  String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  @@id([hotelId, yearMonth])
 }

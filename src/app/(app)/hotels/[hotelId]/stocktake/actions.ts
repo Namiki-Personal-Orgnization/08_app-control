@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession, requireAdmin } from "@/lib/session";
+import { requireAdmin, requireHotelAccess } from "@/lib/session";
 import { parseUnitRates, toBase, unitRatesSchema } from "@/lib/unit";
 import { currentYearMonth } from "@/lib/utils";
+import { isValidHotelId } from "@/config/hotels";
 
 const upsertSnapshotSchema = z.object({
+  hotelId: z.string().min(1),
   yearMonth: z.string().regex(/^\d{4}-\d{2}$/),
   locationId: z.string().min(1),
   entries: z
@@ -29,14 +31,19 @@ export type StocktakeActionState = {
 export async function saveStocktakeAction(
   payload: z.infer<typeof upsertSnapshotSchema>,
 ): Promise<StocktakeActionState> {
-  const session = await requireSession();
   const parsed = upsertSnapshotSchema.safeParse(payload);
-  if (!parsed.success) {
+  if (!parsed.success || !isValidHotelId(parsed.data.hotelId)) {
     return { error: "入力内容を確認してください" };
   }
+  const session = await requireHotelAccess(parsed.data.hotelId);
 
   const close = await prisma.monthlyCloseStatus.findUnique({
-    where: { yearMonth: parsed.data.yearMonth },
+    where: {
+      hotelId_yearMonth: {
+        hotelId: parsed.data.hotelId,
+        yearMonth: parsed.data.yearMonth,
+      },
+    },
   });
   if (close?.closedAt) {
     return { error: "この月は既に確定済みです" };
@@ -45,10 +52,14 @@ export async function saveStocktakeAction(
   const location = await prisma.location.findUnique({
     where: { id: parsed.data.locationId },
   });
-  if (!location) return { error: "保管場所が見つかりません" };
+  if (!location || location.hotelId !== parsed.data.hotelId) {
+    return { error: "保管場所が見つかりません" };
+  }
 
   const itemIds = parsed.data.entries.map((e) => e.itemId);
-  const items = await prisma.item.findMany({ where: { id: { in: itemIds } } });
+  const items = await prisma.item.findMany({
+    where: { id: { in: itemIds }, hotelId: parsed.data.hotelId },
+  });
   const itemMap = new Map(items.map((i) => [i.id, i]));
 
   await prisma.$transaction(async (tx) => {
@@ -60,7 +71,8 @@ export async function saveStocktakeAction(
 
       await tx.inventorySnapshot.upsert({
         where: {
-          yearMonth_itemId_locationId: {
+          hotelId_yearMonth_itemId_locationId: {
+            hotelId: parsed.data.hotelId,
             yearMonth: parsed.data.yearMonth,
             itemId: entry.itemId,
             locationId: parsed.data.locationId,
@@ -73,6 +85,7 @@ export async function saveStocktakeAction(
           confirmedAt: new Date(),
         },
         create: {
+          hotelId: parsed.data.hotelId,
           yearMonth: parsed.data.yearMonth,
           itemId: entry.itemId,
           locationId: parsed.data.locationId,
@@ -84,6 +97,7 @@ export async function saveStocktakeAction(
 
       await tx.stockLog.create({
         data: {
+          hotelId: parsed.data.hotelId,
           type: "COUNT",
           itemId: entry.itemId,
           locationId: parsed.data.locationId,
@@ -95,13 +109,16 @@ export async function saveStocktakeAction(
     }
   });
 
-  revalidatePath("/stocktake");
-  revalidatePath(`/stocktake/${parsed.data.locationId}`);
-  revalidatePath("/dashboard");
+  revalidatePath(`/hotels/${parsed.data.hotelId}/stocktake`);
+  revalidatePath(
+    `/hotels/${parsed.data.hotelId}/stocktake/${parsed.data.locationId}`,
+  );
+  revalidatePath(`/hotels/${parsed.data.hotelId}/dashboard`);
   return { ok: true };
 }
 
 const closeSchema = z.object({
+  hotelId: z.string().min(1),
   yearMonth: z.string().regex(/^\d{4}-\d{2}$/),
 });
 
@@ -110,18 +127,23 @@ export async function closeMonthAction(
 ): Promise<StocktakeActionState> {
   const session = await requireAdmin();
   const parsed = closeSchema.safeParse(payload);
-  if (!parsed.success) return { error: "不正な月指定です" };
+  if (!parsed.success || !isValidHotelId(parsed.data.hotelId)) {
+    return { error: "不正な月指定です" };
+  }
 
   const ym = parsed.data.yearMonth;
+  const hotelId = parsed.data.hotelId;
   if (ym > currentYearMonth()) {
     return { error: "未来の月は確定できません" };
   }
 
   const [locations, items, snapshots, close] = await Promise.all([
-    prisma.location.findMany({ where: { isActive: true } }),
-    prisma.item.findMany({ where: { isActive: true } }),
-    prisma.inventorySnapshot.findMany({ where: { yearMonth: ym } }),
-    prisma.monthlyCloseStatus.findUnique({ where: { yearMonth: ym } }),
+    prisma.location.findMany({ where: { hotelId, isActive: true } }),
+    prisma.item.findMany({ where: { hotelId, isActive: true } }),
+    prisma.inventorySnapshot.findMany({ where: { hotelId, yearMonth: ym } }),
+    prisma.monthlyCloseStatus.findUnique({
+      where: { hotelId_yearMonth: { hotelId, yearMonth: ym } },
+    }),
   ]);
 
   if (close?.closedAt) {
@@ -145,12 +167,17 @@ export async function closeMonthAction(
   }
 
   await prisma.monthlyCloseStatus.upsert({
-    where: { yearMonth: ym },
+    where: { hotelId_yearMonth: { hotelId, yearMonth: ym } },
     update: { closedAt: new Date(), closedBy: session.operator },
-    create: { yearMonth: ym, closedAt: new Date(), closedBy: session.operator },
+    create: {
+      hotelId,
+      yearMonth: ym,
+      closedAt: new Date(),
+      closedBy: session.operator,
+    },
   });
-  revalidatePath("/stocktake");
-  revalidatePath("/dashboard");
+  revalidatePath(`/hotels/${hotelId}/stocktake`);
+  revalidatePath(`/hotels/${hotelId}/dashboard`);
   return { ok: true, message: "棚卸しを確定しました" };
 }
 
@@ -159,12 +186,19 @@ export async function reopenMonthAction(
 ): Promise<StocktakeActionState> {
   await requireAdmin();
   const parsed = closeSchema.safeParse(payload);
-  if (!parsed.success) return { error: "不正な月指定です" };
+  if (!parsed.success || !isValidHotelId(parsed.data.hotelId)) {
+    return { error: "不正な月指定です" };
+  }
   await prisma.monthlyCloseStatus.update({
-    where: { yearMonth: parsed.data.yearMonth },
+    where: {
+      hotelId_yearMonth: {
+        hotelId: parsed.data.hotelId,
+        yearMonth: parsed.data.yearMonth,
+      },
+    },
     data: { closedAt: null, closedBy: null },
   });
-  revalidatePath("/stocktake");
-  revalidatePath("/dashboard");
+  revalidatePath(`/hotels/${parsed.data.hotelId}/stocktake`);
+  revalidatePath(`/hotels/${parsed.data.hotelId}/dashboard`);
   return { ok: true };
 }

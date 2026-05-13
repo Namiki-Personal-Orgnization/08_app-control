@@ -22,20 +22,25 @@ import { TrendChart } from "./trend-chart";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ hotelId: string }>;
   searchParams: Promise<{ month?: string }>;
 }) {
+  const { hotelId } = await params;
   const sp = await searchParams;
   const yearMonth = sp.month ?? currentYearMonth();
 
   const [consumption, trend, close, totals] = await Promise.all([
-    computeConsumptionForMonth(yearMonth),
-    getConsumptionTrend(6),
-    prisma.monthlyCloseStatus.findUnique({ where: { yearMonth } }),
+    computeConsumptionForMonth(hotelId, yearMonth),
+    getConsumptionTrend(hotelId, 6),
+    prisma.monthlyCloseStatus.findUnique({
+      where: { hotelId_yearMonth: { hotelId, yearMonth } },
+    }),
     prisma.$transaction([
-      prisma.item.count({ where: { isActive: true } }),
-      prisma.location.count({ where: { isActive: true } }),
+      prisma.item.count({ where: { hotelId, isActive: true } }),
+      prisma.location.count({ where: { hotelId, isActive: true } }),
     ]),
   ]);
 
@@ -64,13 +69,13 @@ export default async function DashboardPage({
           icon={<Boxes className="h-5 w-5" />}
           label="商品数"
           value={itemCount.toString()}
-          href="/admin/items"
+          href={`/hotels/${hotelId}/admin/items`}
         />
         <SummaryCard
           icon={<ClipboardList className="h-5 w-5" />}
           label="拠点数"
           value={locationCount.toString()}
-          href="/admin/locations"
+          href={`/hotels/${hotelId}/admin/locations`}
         />
         <SummaryCard
           icon={<TrendingDown className="h-5 w-5" />}
@@ -198,13 +203,13 @@ export default async function DashboardPage({
             次の作業を選んでください
           </p>
           <Link
-            href="/arrivals"
+            href={`/hotels/${hotelId}/arrivals`}
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
           >
             入荷を登録
           </Link>
           <Link
-            href="/stocktake"
+            href={`/hotels/${hotelId}/stocktake`}
             className="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium"
           >
             棚卸しへ

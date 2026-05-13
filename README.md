@@ -57,14 +57,32 @@ Vercel プロジェクト → **Deployments** タブ → 最新のデプロイ�
 ## 機能一覧
 
 - 共有アカウントログイン（staff / admin） + 担当者名選択
-- 保管場所マスタ（フロア・ルーム・写真）
-- 商品マスタ（最小単位・換算比率・アラート閾値・写真）
+- **複数店舗（ホテル）対応**（コードで店舗マスタを管理、ログイン後に店舗を選択）
+- 保管場所マスタ（フロア・ルーム・写真）店舗単位で管理
+- 商品マスタ（最小単位・換算比率・アラート閾値・写真）店舗単位で管理
 - 入荷登録（StockLog ARRIVAL に記録、履歴表示）
 - 棚卸し進捗チェックリスト（未入力 / 入力中 / 完了）
 - 棚卸し入力（単位パッド・最小単位換算・localStorage 下書き）
 - 月次確定処理（全入力バリデーション → InventorySnapshot 生成）
 - ダッシュボード（消費数自動計算、アラート、6 ヶ月トレンドグラフ）
 - PWA 対応（manifest + アイコン、スマホ「ホーム画面に追加」可能）
+
+### 店舗を追加する方法（コードで管理）
+
+`src/config/hotels.ts` の `HOTELS` 配列に項目を追加して `git push` するだけで店舗が増えます。
+管理画面からは追加できません（誤って増えるのを防ぐためコードで管理）。
+
+```ts
+export const HOTELS = [
+  { id: "tokyo", name: "ホテル東京", shortName: "東京", address: null },
+  { id: "osaka", name: "ホテル大阪", shortName: "大阪", address: null }, // 追加
+] as const satisfies ReadonlyArray<Hotel>;
+```
+
+- `id` は DB のレコードと紐づくため、一度設定したら変更しないでください。
+- 追加後、Vercel が自動で再デプロイ → 管理者でログインしてヘッダーから店舗を切り替え → 新店舗の場所・商品マスタを登録。
+- スタッフは「自分が選んだ店舗のデータのみ」見える設計です（URL を直打ちしても他店舗は見られません）。
+- 管理者はヘッダー右上のドロップダウンからいつでも切り替え可能。
 
 ## 技術スタック
 
@@ -111,21 +129,24 @@ http://localhost:3000 にアクセス → `staff` または `admin` でログイ
 ```
 src/
   app/
-    (auth)/login          ログイン画面
-    (auth)/select-operator 担当者名選択
-    (app)/dashboard       ダッシュボード
-    (app)/arrivals        入荷登録
-    (app)/stocktake       棚卸し進捗 + 場所別入力
-    (app)/admin/*         マスタ管理・履歴
-    api/auth/*            ログイン/ログアウト/担当者名 API
+    (auth)/login                       ログイン画面
+    (auth)/select-operator             担当者名選択
+    (auth)/select-hotel                店舗選択（1店舗のときは自動スキップ）
+    (app)/hotels/[hotelId]/dashboard   ダッシュボード
+    (app)/hotels/[hotelId]/arrivals    入荷登録
+    (app)/hotels/[hotelId]/stocktake   棚卸し進捗 + 場所別入力
+    (app)/hotels/[hotelId]/admin/*     マスタ管理・履歴
+    api/auth/*                         ログイン/ログアウト/担当者名/店舗 API
   components/
-    layout                ヘッダー・ナビ
+    layout                ヘッダー・ナビ（店舗切り替えUI含む）
     stocktake             単位入力パッド等
     ui                    shadcn/ui 互換コンポーネント
+  config/
+    hotels.ts             ★店舗マスタ（複数店舗を追加する場合はここに追記）
   lib/
     prisma.ts             Prisma クライアント
     supabase.ts           Storage クライアント
-    session.ts            iron-session 設定
+    session.ts            iron-session 設定（currentHotelId 保持）
     unit.ts               単位換算ロジック
     consumption.ts        消費数計算
   proxy.ts                Next.js 16 ミドルウェア（旧 middleware.ts）

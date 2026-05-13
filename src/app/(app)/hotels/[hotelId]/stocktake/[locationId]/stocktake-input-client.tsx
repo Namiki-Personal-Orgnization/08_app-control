@@ -30,6 +30,7 @@ type ItemRow = {
 };
 
 export function StocktakeInputClient({
+  hotelId,
   yearMonth,
   locationId,
   locationLabel,
@@ -37,6 +38,7 @@ export function StocktakeInputClient({
   items,
   readOnly,
 }: {
+  hotelId: string;
   yearMonth: string;
   locationId: string;
   locationLabel: string;
@@ -46,7 +48,7 @@ export function StocktakeInputClient({
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const draftKey = `stocktake:${yearMonth}:${locationId}`;
+  const draftKey = `stocktake:${hotelId}:${yearMonth}:${locationId}`;
 
   const [drafts, setDrafts] = React.useState<Record<string, RawInputs>>(() => {
     const initial: Record<string, RawInputs> = {};
@@ -105,6 +107,7 @@ export function StocktakeInputClient({
 
     setSubmitting(true);
     const res = await saveStocktakeAction({
+      hotelId,
       yearMonth,
       locationId,
       entries,
@@ -120,7 +123,7 @@ export function StocktakeInputClient({
         // ignore
       }
       toast({ title: "棚卸しを保存しました", description: locationLabel });
-      router.push(`/stocktake?month=${yearMonth}`);
+      router.push(`/hotels/${hotelId}/stocktake?month=${yearMonth}`);
       router.refresh();
     }
   }

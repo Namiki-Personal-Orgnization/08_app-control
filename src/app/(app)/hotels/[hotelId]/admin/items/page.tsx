@@ -6,8 +6,14 @@ import { parseUnitRates } from "@/lib/unit";
 
 export const dynamic = "force-dynamic";
 
-export default async function ItemsPage() {
+export default async function ItemsPage({
+  params,
+}: {
+  params: Promise<{ hotelId: string }>;
+}) {
+  const { hotelId } = await params;
   const items = await prisma.item.findMany({
+    where: { hotelId },
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
   const data = items.map((i) => ({
@@ -27,7 +33,7 @@ export default async function ItemsPage() {
         title="商品マスタ"
         description="商品の単位換算とアラート閾値を管理します。"
       />
-      <ItemsClient items={data} />
+      <ItemsClient hotelId={hotelId} items={data} />
     </div>
   );
 }

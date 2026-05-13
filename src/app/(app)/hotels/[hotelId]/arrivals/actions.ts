@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireHotelAccess, requireSession } from "@/lib/session";
 import { parseUnitRates, toBase, unitRatesSchema } from "@/lib/unit";
+import { isValidHotelId } from "@/config/hotels";
 
 const arrivalSchema = z.object({
+  hotelId: z.string().min(1),
   itemId: z.string().min(1),
   locationId: z.string().min(1),
   rawInputs: z.record(z.string(), z.number().int().nonnegative()),
@@ -21,20 +23,20 @@ export type ArrivalActionState = {
 export async function createArrivalAction(
   payload: z.infer<typeof arrivalSchema>,
 ): Promise<ArrivalActionState> {
-  const session = await requireSession();
   const parsed = arrivalSchema.safeParse(payload);
-  if (!parsed.success) {
+  if (!parsed.success || !isValidHotelId(parsed.data.hotelId)) {
     return { error: "入力内容を確認してください" };
   }
+  const session = await requireHotelAccess(parsed.data.hotelId);
 
   const item = await prisma.item.findUnique({ where: { id: parsed.data.itemId } });
-  if (!item || !item.isActive) {
+  if (!item || !item.isActive || item.hotelId !== parsed.data.hotelId) {
     return { error: "商品が見つかりません" };
   }
   const location = await prisma.location.findUnique({
     where: { id: parsed.data.locationId },
   });
-  if (!location || !location.isActive) {
+  if (!location || !location.isActive || location.hotelId !== parsed.data.hotelId) {
     return { error: "保管場所が見つかりません" };
   }
 
@@ -47,6 +49,7 @@ export async function createArrivalAction(
 
   await prisma.stockLog.create({
     data: {
+      hotelId: parsed.data.hotelId,
       type: "ARRIVAL",
       itemId: parsed.data.itemId,
       locationId: parsed.data.locationId,
@@ -56,22 +59,28 @@ export async function createArrivalAction(
       note: parsed.data.note?.trim() || null,
     },
   });
-  revalidatePath("/arrivals");
-  revalidatePath("/dashboard");
+  revalidatePath(`/hotels/${parsed.data.hotelId}/arrivals`);
+  revalidatePath(`/hotels/${parsed.data.hotelId}/dashboard`);
   return { ok: true };
 }
 
-export async function deleteArrivalAction(id: string): Promise<ArrivalActionState> {
+export async function deleteArrivalAction(
+  hotelId: string,
+  id: string,
+): Promise<ArrivalActionState> {
+  if (!isValidHotelId(hotelId)) {
+    return { error: "店舗が見つかりません" };
+  }
   const session = await requireSession();
   if (session.role !== "admin") {
     return { error: "管理者のみ削除できます" };
   }
   const existing = await prisma.stockLog.findUnique({ where: { id } });
-  if (!existing || existing.type !== "ARRIVAL") {
+  if (!existing || existing.type !== "ARRIVAL" || existing.hotelId !== hotelId) {
     return { error: "対象が見つかりません" };
   }
   await prisma.stockLog.delete({ where: { id } });
-  revalidatePath("/arrivals");
-  revalidatePath("/dashboard");
+  revalidatePath(`/hotels/${hotelId}/arrivals`);
+  revalidatePath(`/hotels/${hotelId}/dashboard`);
   return { ok: true };
 }

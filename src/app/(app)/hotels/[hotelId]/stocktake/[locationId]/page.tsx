@@ -14,26 +14,28 @@ export default async function StocktakeLocationPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ locationId: string }>;
+  params: Promise<{ hotelId: string; locationId: string }>;
   searchParams: Promise<{ month?: string }>;
 }) {
-  const { locationId } = await params;
+  const { hotelId, locationId } = await params;
   const sp = await searchParams;
   const yearMonth = sp.month ?? currentYearMonth();
 
   const [location, items, snapshots, close] = await Promise.all([
     prisma.location.findUnique({ where: { id: locationId } }),
     prisma.item.findMany({
-      where: { isActive: true },
+      where: { hotelId, isActive: true },
       orderBy: [{ category: "asc" }, { name: "asc" }],
     }),
     prisma.inventorySnapshot.findMany({
-      where: { yearMonth, locationId },
+      where: { hotelId, yearMonth, locationId },
     }),
-    prisma.monthlyCloseStatus.findUnique({ where: { yearMonth } }),
+    prisma.monthlyCloseStatus.findUnique({
+      where: { hotelId_yearMonth: { hotelId, yearMonth } },
+    }),
   ]);
 
-  if (!location) notFound();
+  if (!location || location.hotelId !== hotelId) notFound();
 
   const snapshotMap = new Map(snapshots.map((s) => [s.itemId, s]));
 
@@ -73,6 +75,7 @@ export default async function StocktakeLocationPage({
         }
       />
       <StocktakeInputClient
+        hotelId={hotelId}
         yearMonth={yearMonth}
         locationId={locationId}
         locationLabel={`${location.floor} ${location.roomName}`}

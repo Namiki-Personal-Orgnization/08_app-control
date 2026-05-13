@@ -7,6 +7,7 @@ export type SessionData = {
   role?: Role;
   operator?: string;
   loginAt?: number;
+  currentHotelId?: string;
 };
 
 const SESSION_PASSWORD =
@@ -42,6 +43,14 @@ export async function requireSession(): Promise<
 export async function requireAdmin() {
   const session = await requireSession();
   if (session.role !== "admin") {
+    throw new Error("FORBIDDEN");
+  }
+  return session;
+}
+
+export async function requireHotelAccess(hotelId: string) {
+  const session = await requireSession();
+  if (session.role === "staff" && session.currentHotelId !== hotelId) {
     throw new Error("FORBIDDEN");
   }
   return session;

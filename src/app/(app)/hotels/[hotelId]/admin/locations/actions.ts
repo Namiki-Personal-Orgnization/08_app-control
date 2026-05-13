@@ -5,8 +5,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { uploadPhoto, deletePhoto } from "@/lib/supabase";
+import { isValidHotelId } from "@/config/hotels";
 
 const locationFormSchema = z.object({
+  hotelId: z.string().min(1),
   id: z.string().optional(),
   floor: z.string().trim().min(1, "フロアを入力してください").max(20),
   roomName: z.string().trim().min(1, "場所名を入力してください").max(60),
@@ -33,9 +35,14 @@ export async function createLocationAction(
 ): Promise<ActionState> {
   await requireAdmin();
   const parsed = locationFormSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "入力内容を確認してください" };
+  if (!parsed.success || !isValidHotelId(parsed.data.hotelId)) {
+    return {
+      error: parsed.success
+        ? "店舗指定が不正です"
+        : (parsed.error.issues[0]?.message ?? "入力内容を確認してください"),
+    };
   }
+  const hotelId = parsed.data.hotelId;
   const photo = formData.get("photo");
   let photoUrl: string | null = null;
   if (photo instanceof File && photo.size > 0) {
@@ -47,6 +54,7 @@ export async function createLocationAction(
   }
   await prisma.location.create({
     data: {
+      hotelId,
       floor: parsed.data.floor,
       roomName: parsed.data.roomName,
       sortOrder: parsed.data.sortOrder,
@@ -54,8 +62,8 @@ export async function createLocationAction(
       photoUrl: photoUrl,
     },
   });
-  revalidatePath("/admin/locations");
-  revalidatePath("/stocktake");
+  revalidatePath(`/hotels/${hotelId}/admin/locations`);
+  revalidatePath(`/hotels/${hotelId}/stocktake`);
   return { ok: true };
 }
 
@@ -65,11 +73,14 @@ export async function updateLocationAction(
 ): Promise<ActionState> {
   await requireAdmin();
   const parsed = locationFormSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success || !parsed.data.id) {
+  if (!parsed.success || !parsed.data.id || !isValidHotelId(parsed.data.hotelId)) {
     return { error: "入力内容を確認してください" };
   }
+  const hotelId = parsed.data.hotelId;
   const existing = await prisma.location.findUnique({ where: { id: parsed.data.id } });
-  if (!existing) return { error: "場所が見つかりません" };
+  if (!existing || existing.hotelId !== hotelId) {
+    return { error: "場所が見つかりません" };
+  }
 
   const photo = formData.get("photo");
   let photoUrl: string | null | undefined = undefined;
@@ -91,28 +102,34 @@ export async function updateLocationAction(
       ...(photoUrl !== undefined ? { photoUrl } : {}),
     },
   });
-  revalidatePath("/admin/locations");
-  revalidatePath("/stocktake");
+  revalidatePath(`/hotels/${hotelId}/admin/locations`);
+  revalidatePath(`/hotels/${hotelId}/stocktake`);
   return { ok: true };
 }
 
-export async function deleteLocationAction(id: string): Promise<ActionState> {
+export async function deleteLocationAction(
+  hotelId: string,
+  id: string,
+): Promise<ActionState> {
+  if (!isValidHotelId(hotelId)) return { error: "店舗が見つかりません" };
   await requireAdmin();
   const existing = await prisma.location.findUnique({ where: { id } });
-  if (!existing) return { error: "場所が見つかりません" };
+  if (!existing || existing.hotelId !== hotelId) {
+    return { error: "場所が見つかりません" };
+  }
   const usage = await prisma.stockLog.count({ where: { locationId: id } });
   if (usage > 0) {
     await prisma.location.update({
       where: { id },
       data: { isActive: false },
     });
-    revalidatePath("/admin/locations");
-    revalidatePath("/stocktake");
+    revalidatePath(`/hotels/${hotelId}/admin/locations`);
+    revalidatePath(`/hotels/${hotelId}/stocktake`);
     return { ok: true };
   }
   if (existing.photoUrl) await deletePhoto(existing.photoUrl);
   await prisma.location.delete({ where: { id } });
-  revalidatePath("/admin/locations");
-  revalidatePath("/stocktake");
+  revalidatePath(`/hotels/${hotelId}/admin/locations`);
+  revalidatePath(`/hotels/${hotelId}/stocktake`);
   return { ok: true };
 }

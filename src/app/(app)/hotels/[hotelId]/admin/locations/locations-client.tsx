@@ -35,7 +35,13 @@ type Location = {
   photoUrl: string | null;
 };
 
-export function LocationsClient({ locations }: { locations: Location[] }) {
+export function LocationsClient({
+  hotelId,
+  locations,
+}: {
+  hotelId: string;
+  locations: Location[];
+}) {
   const [editing, setEditing] = React.useState<Location | null>(null);
   const [creating, setCreating] = React.useState(false);
 
@@ -72,6 +78,7 @@ export function LocationsClient({ locations }: { locations: Location[] }) {
                 {list.map((l) => (
                   <LocationCard
                     key={l.id}
+                    hotelId={hotelId}
                     location={l}
                     onEdit={() => setEditing(l)}
                   />
@@ -83,11 +90,13 @@ export function LocationsClient({ locations }: { locations: Location[] }) {
       )}
 
       <LocationFormDialog
+        hotelId={hotelId}
         open={creating}
         onOpenChange={(o) => setCreating(o)}
         location={null}
       />
       <LocationFormDialog
+        hotelId={hotelId}
         open={!!editing}
         onOpenChange={(o) => !o && setEditing(null)}
         location={editing}
@@ -97,9 +106,11 @@ export function LocationsClient({ locations }: { locations: Location[] }) {
 }
 
 function LocationCard({
+  hotelId,
   location,
   onEdit,
 }: {
+  hotelId: string;
   location: Location;
   onEdit: () => void;
 }) {
@@ -109,7 +120,7 @@ function LocationCard({
   async function handleDelete() {
     if (!confirm(`${location.floor} ${location.roomName} を削除しますか？\n（過去ログがある場合は無効化されます）`)) return;
     setDeleting(true);
-    const res = await deleteLocationAction(location.id);
+    const res = await deleteLocationAction(hotelId, location.id);
     setDeleting(false);
     if (res.error) {
       toast({ variant: "destructive", title: "削除失敗", description: res.error });
@@ -152,10 +163,12 @@ function LocationCard({
 }
 
 function LocationFormDialog({
+  hotelId,
   open,
   onOpenChange,
   location,
 }: {
+  hotelId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   location: Location | null;
@@ -184,6 +197,7 @@ function LocationFormDialog({
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="space-y-3">
+          <input type="hidden" name="hotelId" value={hotelId} />
           {location && <input type="hidden" name="id" value={location.id} />}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">

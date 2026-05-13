@@ -6,8 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { uploadPhoto, deletePhoto } from "@/lib/supabase";
 import { unitRatesSchema } from "@/lib/unit";
+import { isValidHotelId } from "@/config/hotels";
 
 const baseSchema = z.object({
+  hotelId: z.string().min(1),
   id: z.string().optional(),
   name: z.string().trim().min(1, "商品名を入力してください").max(60),
   category: z.string().trim().max(30).optional().or(z.literal("")),
@@ -51,9 +53,10 @@ export async function updateItemAction(
 
 async function saveItem(formData: FormData, isUpdate: boolean): Promise<ItemActionState> {
   const parsed = baseSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "入力内容を確認してください" };
+  if (!parsed.success || !isValidHotelId(parsed.data.hotelId)) {
+    return { error: parsed.success ? "店舗指定が不正です" : (parsed.error.issues[0]?.message ?? "入力内容を確認してください") };
   }
+  const hotelId = parsed.data.hotelId;
 
   let unitRates: { name: string; rate: number }[] = [];
   try {
@@ -90,7 +93,9 @@ async function saveItem(formData: FormData, isUpdate: boolean): Promise<ItemActi
   if (isUpdate) {
     if (!parsed.data.id) return { error: "更新対象が不明です" };
     const existing = await prisma.item.findUnique({ where: { id: parsed.data.id } });
-    if (!existing) return { error: "商品が見つかりません" };
+    if (!existing || existing.hotelId !== hotelId) {
+      return { error: "商品が見つかりません" };
+    }
     if (photoUrl && existing.photoUrl) {
       await deletePhoto(existing.photoUrl);
     }
@@ -110,6 +115,7 @@ async function saveItem(formData: FormData, isUpdate: boolean): Promise<ItemActi
   } else {
     await prisma.item.create({
       data: {
+        hotelId,
         name: parsed.data.name,
         category: parsed.data.category || null,
         baseUnit: parsed.data.baseUnit,
@@ -121,25 +127,31 @@ async function saveItem(formData: FormData, isUpdate: boolean): Promise<ItemActi
       },
     });
   }
-  revalidatePath("/admin/items");
-  revalidatePath("/dashboard");
-  revalidatePath("/arrivals");
-  revalidatePath("/stocktake");
+  revalidatePath(`/hotels/${hotelId}/admin/items`);
+  revalidatePath(`/hotels/${hotelId}/dashboard`);
+  revalidatePath(`/hotels/${hotelId}/arrivals`);
+  revalidatePath(`/hotels/${hotelId}/stocktake`);
   return { ok: true };
 }
 
-export async function deleteItemAction(id: string): Promise<ItemActionState> {
+export async function deleteItemAction(
+  hotelId: string,
+  id: string,
+): Promise<ItemActionState> {
+  if (!isValidHotelId(hotelId)) return { error: "店舗が見つかりません" };
   await requireAdmin();
   const existing = await prisma.item.findUnique({ where: { id } });
-  if (!existing) return { error: "商品が見つかりません" };
+  if (!existing || existing.hotelId !== hotelId) {
+    return { error: "商品が見つかりません" };
+  }
   const usage = await prisma.stockLog.count({ where: { itemId: id } });
   if (usage > 0) {
     await prisma.item.update({ where: { id }, data: { isActive: false } });
-    revalidatePath("/admin/items");
+    revalidatePath(`/hotels/${hotelId}/admin/items`);
     return { ok: true };
   }
   if (existing.photoUrl) await deletePhoto(existing.photoUrl);
   await prisma.item.delete({ where: { id } });
-  revalidatePath("/admin/items");
+  revalidatePath(`/hotels/${hotelId}/admin/items`);
   return { ok: true };
 }

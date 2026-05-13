@@ -15,28 +15,30 @@ export type ConsumptionResult = {
 };
 
 export async function computeConsumptionForMonth(
+  hotelId: string,
   yearMonth: string,
 ): Promise<ConsumptionResult[]> {
   const previous = prevYearMonth(yearMonth);
   const items = await prisma.item.findMany({
-    where: { isActive: true },
+    where: { hotelId, isActive: true },
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
 
   const [openingSnapshots, closingSnapshots, monthArrivals] = await Promise.all([
     prisma.inventorySnapshot.groupBy({
       by: ["itemId"],
-      where: { yearMonth: previous },
+      where: { hotelId, yearMonth: previous },
       _sum: { confirmedQty: true },
     }),
     prisma.inventorySnapshot.groupBy({
       by: ["itemId"],
-      where: { yearMonth: yearMonth },
+      where: { hotelId, yearMonth: yearMonth },
       _sum: { confirmedQty: true },
     }),
     prisma.stockLog.groupBy({
       by: ["itemId"],
       where: {
+        hotelId,
         type: "ARRIVAL",
         occurredAt: {
           gte: monthStart(yearMonth),
@@ -81,7 +83,7 @@ export async function computeConsumptionForMonth(
   });
 }
 
-export async function getConsumptionTrend(months: number) {
+export async function getConsumptionTrend(hotelId: string, months: number) {
   const list: { yearMonth: string }[] = [];
   const now = new Date();
   for (let i = months - 1; i >= 0; i--) {
@@ -92,7 +94,7 @@ export async function getConsumptionTrend(months: number) {
   }
   const results = await Promise.all(
     list.map(async (l) => {
-      const data = await computeConsumptionForMonth(l.yearMonth);
+      const data = await computeConsumptionForMonth(hotelId, l.yearMonth);
       const total = data.reduce((acc, d) => acc + Math.max(0, d.consumedQty), 0);
       return { yearMonth: l.yearMonth, total, byItem: data };
     }),

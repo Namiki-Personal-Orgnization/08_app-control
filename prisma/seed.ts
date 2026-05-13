@@ -1,18 +1,21 @@
 import { PrismaClient } from "@prisma/client";
+import { DEFAULT_HOTEL_ID } from "../src/config/hotels";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const hotelId = DEFAULT_HOTEL_ID;
+
   const locations = [
-    { floor: "1F", roomName: "リネン庫", sortOrder: 10 },
-    { floor: "1F", roomName: "アメニティ倉庫", sortOrder: 20 },
-    { floor: "2F", roomName: "清掃ワゴン置場", sortOrder: 30 },
-    { floor: "3F", roomName: "客室備品庫", sortOrder: 40 },
+    { hotelId, floor: "1F", roomName: "リネン庫", sortOrder: 10 },
+    { hotelId, floor: "1F", roomName: "アメニティ倉庫", sortOrder: 20 },
+    { hotelId, floor: "2F", roomName: "清掃ワゴン置場", sortOrder: 30 },
+    { hotelId, floor: "3F", roomName: "客室備品庫", sortOrder: 40 },
   ];
 
   for (const loc of locations) {
     const exists = await prisma.location.findFirst({
-      where: { floor: loc.floor, roomName: loc.roomName },
+      where: { hotelId: loc.hotelId, floor: loc.floor, roomName: loc.roomName },
     });
     if (!exists) {
       await prisma.location.create({ data: loc });
@@ -21,6 +24,7 @@ async function main() {
 
   const items = [
     {
+      hotelId,
       name: "歯ブラシ",
       category: "アメニティ",
       baseUnit: "本",
@@ -32,6 +36,7 @@ async function main() {
       alertThreshold: 100,
     },
     {
+      hotelId,
       name: "シャンプー(小)",
       category: "アメニティ",
       baseUnit: "本",
@@ -40,6 +45,7 @@ async function main() {
       alertThreshold: 50,
     },
     {
+      hotelId,
       name: "バスタオル",
       category: "リネン",
       baseUnit: "枚",
@@ -49,13 +55,15 @@ async function main() {
   ];
 
   for (const item of items) {
-    const exists = await prisma.item.findFirst({ where: { name: item.name } });
+    const exists = await prisma.item.findFirst({
+      where: { hotelId: item.hotelId, name: item.name },
+    });
     if (!exists) {
       await prisma.item.create({ data: item });
     }
   }
 
-  console.log("Seed completed.");
+  console.log(`Seed completed for hotel: ${hotelId}`);
 }
 
 main()

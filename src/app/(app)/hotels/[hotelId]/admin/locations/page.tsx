@@ -5,8 +5,14 @@ import { getPublicUrl } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-export default async function LocationsPage() {
+export default async function LocationsPage({
+  params,
+}: {
+  params: Promise<{ hotelId: string }>;
+}) {
+  const { hotelId } = await params;
   const locations = await prisma.location.findMany({
+    where: { hotelId },
     orderBy: [{ floor: "asc" }, { sortOrder: "asc" }, { roomName: "asc" }],
   });
   const data = locations.map((l) => ({
@@ -21,7 +27,7 @@ export default async function LocationsPage() {
         title="場所マスタ"
         description="フロアと保管場所を管理します。"
       />
-      <LocationsClient locations={data} />
+      <LocationsClient hotelId={hotelId} locations={data} />
     </div>
   );
 }

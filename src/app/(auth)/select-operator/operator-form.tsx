@@ -56,7 +56,7 @@ export function OperatorForm() {
       } catch {
         // ignore
       }
-      router.push("/dashboard");
+      router.push("/select-hotel");
       router.refresh();
     } finally {
       setLoading(false);

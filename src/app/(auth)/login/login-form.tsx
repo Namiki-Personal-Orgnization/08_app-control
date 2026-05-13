@@ -36,7 +36,11 @@ export function LoginForm() {
       }
       const from = params.get("from");
       if (data.role === "admin") {
-        router.push(from && from !== "/" ? from : "/dashboard");
+        if (from && from !== "/" && from.startsWith("/hotels/")) {
+          router.push(from);
+        } else {
+          router.push("/select-hotel");
+        }
       } else {
         router.push("/select-operator");
       }

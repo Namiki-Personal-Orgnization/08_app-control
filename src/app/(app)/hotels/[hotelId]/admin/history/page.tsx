@@ -7,14 +7,21 @@ import { ReopenMonthButton } from "../../stocktake/month-actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminHistoryPage() {
+export default async function AdminHistoryPage({
+  params,
+}: {
+  params: Promise<{ hotelId: string }>;
+}) {
+  const { hotelId } = await params;
   const [recentLogs, closes] = await Promise.all([
     prisma.stockLog.findMany({
+      where: { hotelId },
       orderBy: { occurredAt: "desc" },
       take: 50,
       include: { item: true, location: true },
     }),
     prisma.monthlyCloseStatus.findMany({
+      where: { hotelId },
       orderBy: { yearMonth: "desc" },
       take: 12,
     }),
@@ -54,7 +61,7 @@ export default async function AdminHistoryPage() {
                   {c.closedAt ? (
                     <div className="flex items-center gap-2">
                       <Badge variant="success">確定済み</Badge>
-                      <ReopenMonthButton yearMonth={c.yearMonth} />
+                      <ReopenMonthButton hotelId={hotelId} yearMonth={c.yearMonth} />
                     </div>
                   ) : (
                     <Badge variant="secondary">未確定</Badge>

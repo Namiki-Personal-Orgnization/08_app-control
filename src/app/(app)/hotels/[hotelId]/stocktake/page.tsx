@@ -15,22 +15,27 @@ import { CloseMonthButton, ReopenMonthButton } from "./month-actions";
 export const dynamic = "force-dynamic";
 
 export default async function StocktakePage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ hotelId: string }>;
   searchParams: Promise<{ month?: string }>;
 }) {
+  const { hotelId } = await params;
   const session = await getSession();
   const sp = await searchParams;
   const yearMonth = sp.month ?? currentYearMonth();
 
   const [locations, items, snapshots, close] = await Promise.all([
     prisma.location.findMany({
-      where: { isActive: true },
+      where: { hotelId, isActive: true },
       orderBy: [{ floor: "asc" }, { sortOrder: "asc" }, { roomName: "asc" }],
     }),
-    prisma.item.findMany({ where: { isActive: true } }),
-    prisma.inventorySnapshot.findMany({ where: { yearMonth } }),
-    prisma.monthlyCloseStatus.findUnique({ where: { yearMonth } }),
+    prisma.item.findMany({ where: { hotelId, isActive: true } }),
+    prisma.inventorySnapshot.findMany({ where: { hotelId, yearMonth } }),
+    prisma.monthlyCloseStatus.findUnique({
+      where: { hotelId_yearMonth: { hotelId, yearMonth } },
+    }),
   ]);
 
   const itemCount = items.length;
@@ -82,11 +87,12 @@ export default async function StocktakePage({
         <div className="flex flex-wrap gap-2">
           {!isClosed ? (
             <CloseMonthButton
+              hotelId={hotelId}
               yearMonth={yearMonth}
               disabled={completedLocations < locations.length || locations.length === 0}
             />
           ) : (
-            <ReopenMonthButton yearMonth={yearMonth} />
+            <ReopenMonthButton hotelId={hotelId} yearMonth={yearMonth} />
           )}
         </div>
       )}
@@ -105,7 +111,7 @@ export default async function StocktakePage({
             return (
               <li key={l.id}>
                 <Link
-                  href={`/stocktake/${l.id}?month=${yearMonth}`}
+                  href={`/hotels/${hotelId}/stocktake/${l.id}?month=${yearMonth}`}
                   className="block"
                 >
                   <Card className="transition-colors hover:bg-muted/30">

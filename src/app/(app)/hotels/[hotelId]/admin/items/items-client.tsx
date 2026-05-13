@@ -39,7 +39,7 @@ type Item = {
   photoUrl: string | null;
 };
 
-export function ItemsClient({ items }: { items: Item[] }) {
+export function ItemsClient({ hotelId, items }: { hotelId: string; items: Item[] }) {
   const [editing, setEditing] = React.useState<Item | null>(null);
   const [creating, setCreating] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -78,6 +78,7 @@ export function ItemsClient({ items }: { items: Item[] }) {
           {filtered.map((item) => (
             <ItemCard
               key={item.id}
+              hotelId={hotelId}
               item={item}
               onEdit={() => setEditing(item)}
             />
@@ -86,11 +87,13 @@ export function ItemsClient({ items }: { items: Item[] }) {
       )}
 
       <ItemFormDialog
+        hotelId={hotelId}
         open={creating}
         onOpenChange={(o) => setCreating(o)}
         item={null}
       />
       <ItemFormDialog
+        hotelId={hotelId}
         open={!!editing}
         onOpenChange={(o) => !o && setEditing(null)}
         item={editing}
@@ -99,13 +102,21 @@ export function ItemsClient({ items }: { items: Item[] }) {
   );
 }
 
-function ItemCard({ item, onEdit }: { item: Item; onEdit: () => void }) {
+function ItemCard({
+  hotelId,
+  item,
+  onEdit,
+}: {
+  hotelId: string;
+  item: Item;
+  onEdit: () => void;
+}) {
   const { toast } = useToast();
   const [deleting, setDeleting] = React.useState(false);
   async function handleDelete() {
     if (!confirm(`${item.name} を削除しますか？\n（過去ログがある場合は無効化されます）`)) return;
     setDeleting(true);
-    const res = await deleteItemAction(item.id);
+    const res = await deleteItemAction(hotelId, item.id);
     setDeleting(false);
     if (res.error) {
       toast({ variant: "destructive", title: "削除失敗", description: res.error });
@@ -156,10 +167,12 @@ function ItemCard({ item, onEdit }: { item: Item; onEdit: () => void }) {
 }
 
 function ItemFormDialog({
+  hotelId,
   open,
   onOpenChange,
   item,
 }: {
+  hotelId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: Item | null;
@@ -199,6 +212,7 @@ function ItemFormDialog({
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="space-y-3">
+          <input type="hidden" name="hotelId" value={hotelId} />
           {item && <input type="hidden" name="id" value={item.id} />}
           <input
             type="hidden"

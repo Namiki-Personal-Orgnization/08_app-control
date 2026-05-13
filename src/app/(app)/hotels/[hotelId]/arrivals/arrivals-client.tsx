@@ -42,10 +42,12 @@ type RecentArrival = {
 };
 
 export function ArrivalsClient({
+  hotelId,
   items,
   locations,
   recent,
 }: {
+  hotelId: string;
   items: Item[];
   locations: Location[];
   recent: RecentArrival[];
@@ -86,6 +88,7 @@ export function ArrivalsClient({
     }
     setSubmitting(true);
     const res = await createArrivalAction({
+      hotelId,
       itemId: selectedItem.id,
       locationId,
       rawInputs: inputs,
@@ -103,7 +106,7 @@ export function ArrivalsClient({
 
   async function handleDelete(id: string) {
     if (!confirm("この入荷ログを削除しますか？")) return;
-    const res = await deleteArrivalAction(id);
+    const res = await deleteArrivalAction(hotelId, id);
     if (res.error) {
       toast({ variant: "destructive", title: "削除失敗", description: res.error });
     } else {

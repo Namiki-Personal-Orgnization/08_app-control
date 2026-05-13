@@ -6,18 +6,23 @@ import { ArrivalsClient } from "./arrivals-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function ArrivalsPage() {
+export default async function ArrivalsPage({
+  params,
+}: {
+  params: Promise<{ hotelId: string }>;
+}) {
+  const { hotelId } = await params;
   const [items, locations, recent] = await Promise.all([
     prisma.item.findMany({
-      where: { isActive: true },
+      where: { hotelId, isActive: true },
       orderBy: [{ category: "asc" }, { name: "asc" }],
     }),
     prisma.location.findMany({
-      where: { isActive: true },
+      where: { hotelId, isActive: true },
       orderBy: [{ floor: "asc" }, { sortOrder: "asc" }, { roomName: "asc" }],
     }),
     prisma.stockLog.findMany({
-      where: { type: "ARRIVAL" },
+      where: { hotelId, type: "ARRIVAL" },
       orderBy: { occurredAt: "desc" },
       take: 30,
       include: { item: true, location: true },
@@ -58,7 +63,12 @@ export default async function ArrivalsPage() {
         title="入荷登録"
         description="商品が届いたら、ここから登録します。"
       />
-      <ArrivalsClient items={itemsData} locations={locationsData} recent={recentData} />
+      <ArrivalsClient
+        hotelId={hotelId}
+        items={itemsData}
+        locations={locationsData}
+        recent={recentData}
+      />
     </div>
   );
 }

@@ -8,9 +8,11 @@ import { useRouter } from "next/navigation";
 import { closeMonthAction, reopenMonthAction } from "./actions";
 
 export function CloseMonthButton({
+  hotelId,
   yearMonth,
   disabled,
 }: {
+  hotelId: string;
   yearMonth: string;
   disabled?: boolean;
 }) {
@@ -21,7 +23,7 @@ export function CloseMonthButton({
   async function handle() {
     if (!confirm(`${yearMonth} の棚卸しを確定します。よろしいですか？`)) return;
     setPending(true);
-    const res = await closeMonthAction({ yearMonth });
+    const res = await closeMonthAction({ hotelId, yearMonth });
     setPending(false);
     if (res.error) {
       toast({ variant: "destructive", title: "確定できません", description: res.error });
@@ -44,7 +46,13 @@ export function CloseMonthButton({
   );
 }
 
-export function ReopenMonthButton({ yearMonth }: { yearMonth: string }) {
+export function ReopenMonthButton({
+  hotelId,
+  yearMonth,
+}: {
+  hotelId: string;
+  yearMonth: string;
+}) {
   const { toast } = useToast();
   const router = useRouter();
   const [pending, setPending] = React.useState(false);
@@ -52,7 +60,7 @@ export function ReopenMonthButton({ yearMonth }: { yearMonth: string }) {
   async function handle() {
     if (!confirm(`${yearMonth} の確定を解除します。よろしいですか？`)) return;
     setPending(true);
-    const res = await reopenMonthAction({ yearMonth });
+    const res = await reopenMonthAction({ hotelId, yearMonth });
     setPending(false);
     if (res.error) {
       toast({ variant: "destructive", title: "解除失敗", description: res.error });
