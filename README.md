@@ -4,37 +4,22 @@
 
 ## 一発デプロイ
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FYOUR_GITHUB_USER%2FYOUR_REPO&project-name=inventory-control&repository-name=inventory-control&env=SESSION_PASSWORD,STAFF_PASSWORD,ADMIN_PASSWORD,SUPABASE_STORAGE_BUCKET&envDescription=SESSION_PASSWORD%E3%81%AF32%E6%96%87%E5%AD%97%E4%BB%A5%E4%B8%8A%E3%81%AE%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E6%96%87%E5%AD%97%E5%88%97%E3%80%82STAFF%2FADMIN_PASSWORD%E3%81%AF%E5%85%B1%E6%9C%89%E3%83%91%E3%82%B9%E3%83%AF%E3%83%BC%E3%83%89%E3%80%82SUPABASE_STORAGE_BUCKET%E3%81%AF%E5%86%99%E7%9C%9F%E4%BF%9D%E5%AD%98%E5%85%88%E3%83%90%E3%82%B1%E3%83%83%E3%83%88%E5%90%8D%EF%BC%88inventory-photos%E6%8E%A8%E5%A5%A8%EF%BC%89&envLink=https%3A%2F%2Fgithub.com%2FYOUR_GITHUB_USER%2FYOUR_REPO%23%E5%BF%85%E8%A6%81%E3%81%AA%E7%92%B0%E5%A2%83%E5%A4%89%E6%95%B0)
-
-> 上記URLは GitHub に push 後、`YOUR_GITHUB_USER/YOUR_REPO` を自身のリポジトリ名に置き換えてください。
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNamiki-Personal-Orgnization%2F08_app-control&project-name=inventory-control&repository-name=08_app-control&env=SESSION_PASSWORD,STAFF_PASSWORD,ADMIN_PASSWORD,SUPABASE_STORAGE_BUCKET&envDescription=SESSION_PASSWORD%E3%81%AF32%E6%96%87%E5%AD%97%E4%BB%A5%E4%B8%8A%E3%81%AE%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E6%96%87%E5%AD%97%E5%88%97%E3%80%82STAFF%2FADMIN_PASSWORD%E3%81%AF%E5%85%B1%E6%9C%89%E3%83%91%E3%82%B9%E3%83%AF%E3%83%BC%E3%83%89%E3%80%82SUPABASE_STORAGE_BUCKET%E3%81%AF%E5%86%99%E7%9C%9F%E4%BF%9D%E5%AD%98%E5%85%88%E3%83%90%E3%82%B1%E3%83%83%E3%83%88%E5%90%8D%EF%BC%88inventory-photos%E6%8E%A8%E5%A5%A8%EF%BC%89&envLink=https%3A%2F%2Fgithub.com%2FNamiki-Personal-Orgnization%2F08_app-control%23%E5%BF%85%E8%A6%81%E3%81%AA%E7%92%B0%E5%A2%83%E5%A4%89%E6%95%B0)
 
 ### デプロイ手順（最短ルート）
 
-#### 1. このリポジトリを GitHub に push
+#### 1. 上の「Deploy with Vercel」ボタンをクリック
 
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-gh repo create inventory-control --public --source=. --push
-```
-
-（`gh` CLI がない場合は GitHub UI でリポジトリ作成して `git remote add origin ... && git push -u origin main`）
-
-#### 2. README の Deploy Button URL を自身のリポに更新 → 上の「Deploy with Vercel」ボタンをクリック
-
-#### 3. Vercel 側で以下を入力するだけ
-
-- **Repository を fork**: 同意して進む
-- **環境変数**:
+- **Repository を clone**: 同意して進む（リポジトリが自分のアカウント配下に複製される）
+- **環境変数**を入力:
   - `SESSION_PASSWORD`: 32文字以上のランダム文字列（`openssl rand -base64 32` で生成可）
   - `STAFF_PASSWORD`: 現場スタッフの共有パスワード
   - `ADMIN_PASSWORD`: 管理者用パスワード
-  - `SUPABASE_STORAGE_BUCKET`: `inventory-photos`（後でこの名前で Bucket を作る）
+  - `SUPABASE_STORAGE_BUCKET`: `inventory-photos`
 
-「Deploy」を押す。**1回目は DB 未接続のためビルドが失敗しますが、それでOK。** 次のステップで接続します。
+「Deploy」を押す。**1回目は DB 未接続のままビルドが完走しデプロイ成功します**（DB スキーマ反映は再デプロイで実行）。
 
-#### 4. Vercel から Supabase をワンクリック接続
+#### 2. Vercel から Supabase をワンクリック接続
 
 Vercel プロジェクト画面 → **Storage** タブ → **Create Database** → **Supabase** を選択 → 「Continue」
 
@@ -50,20 +35,20 @@ Vercel プロジェクト画面 → **Storage** タブ → **Create Database** �
 - `SUPABASE_SERVICE_ROLE_KEY`
 - 他
 
-#### 5. Supabase Storage Bucket を作成
+#### 3. Supabase Storage Bucket を作成
 
 Vercel Storage 画面の「Open in Supabase」をクリック → Supabase ダッシュボード → **Storage** → **New bucket**
 
 - Name: `inventory-photos`
 - **Public bucket: ON** に設定（写真表示のため）
 
-#### 6. Vercel で再デプロイ
+#### 4. Vercel で再デプロイ
 
 Vercel プロジェクト → **Deployments** タブ → 最新のデプロイの「⋯」→ **Redeploy**
 
 ビルド時に `prisma db push` が走り、自動でテーブルが作成されます。
 
-#### 7. アクセス
+#### 5. アクセス
 
 デプロイ完了 → 表示された URL にアクセス → `staff` または `admin` でログイン。
 
