@@ -4,7 +4,7 @@ import { ToastRoot } from "@/components/ui/use-toast";
 import { ReactQueryProvider } from "@/components/providers/react-query-provider";
 
 export const metadata: Metadata = {
-  title: "ホテル在庫管理",
+  title: "ホテル在庫管",
   description: "ホテル現場の月次棚卸し業務をデジタル化する在庫管理ツール",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
